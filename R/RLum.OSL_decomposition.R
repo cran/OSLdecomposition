@@ -1,28 +1,27 @@
-#' Separate CW-OSL components in RLum.Analysis data sets
+#' @title Separate CW-OSL components in RLum.Analysis data sets
 #'
-#' Calculates the CW-OSL signal component intensities for each CW-OSL measurement
+#' @description Calculates the CW-OSL signal component intensities for each CW-OSL measurement
 #' under the requirement that the decay rates are already given. The signal decomposition
 #' process uses an analytical approach described in detail in Mittelstrass (2019) and
-#' Mittelstrass et al. (in preparation). This function processes [RLum.Analysis-class] data sets created within
-#' the [Luminescence-package] (Kreutzer et al. 2012).
+#' Mittelstrass et al. (in preparation). This function processes [Luminescence::RLum.Analysis-class] data sets created within the [Luminescence::Luminescence-package] (Kreutzer et al. 2012).
 #'
 #' The workflow of this function is as follows:
 #'
 #' \enumerate{
-#'   \item [optimise_OSLintervals]: {Approximates the optimal integration intervals. Uses the global
-#'   average curve as time axis template. If none global average curve is given, one is automatically created using [sum_OSLcurves].}
-#'   \item [decompose_OSLcurve]: {Calculates component intensities for **all** `record_type` measurements.
+#'   \item [optimise_OSLintervals]: Approximates the optimal integration intervals. Uses the global
+#'   average curve as time axis template. If none global average curve is given, one is automatically created using [sum_OSLcurves].
+#'   \item [decompose_OSLcurve]: Calculates component intensities for **all** `record_type` measurements.
 #'   Uses the `"det"` algorithm if a background correction was performed with [RLum.OSL_correction] or the
-#'   `"det+nls"` algorithm if no background correction was performed. For error estimation, the `"empiric"` approach is used.}
+#'   `"det+nls"` algorithm if no background correction was performed. For error estimation, the `"empiric"` approach is used.
 #'   \item Creates a `html` report to summarize the results (*optional*).
 #'}
 #'
-#' Data sets must be formatted as [RLum.Analysis-class] objects and
+#' Data sets must be formatted as [Luminescence::RLum.Analysis-class] objects and
 #' should have been processed with [RLum.OSL_correction] and [RLum.OSL_global_fitting] beforehand.
-#' Output objects are also [RLum.Analysis-class] objects and are
+#' Output objects are also [Luminescence::RLum.Analysis-class] objects and are
 #' meant for equivalent dose determination with [Luminescence::analyse_SAR.CWOSL].
 #'
-#' If `report = TRUE`, a `html` report of the results is rendered by the [rmarkdown-package]
+#' If `report = TRUE`, a `html` report of the results is rendered by the [rmarkdown::rmarkdown-package]
 #' and saved in the working directory, which is usually the directory of the data file.
 #' This report can be displayed, shared and published online without any requirements regarding
 #' the operation system or installed software. However, an internet connection is needed to display
@@ -32,13 +31,14 @@
 #' `system.file("rmd", "report_Step2.Rmd", package = "OSLdecomposition")`
 #'
 #'
-#' @param object [RLum.Analysis-class] or [list] of [RLum.Analysis-class] (**required**):
+#' @param object [Luminescence::RLum.Analysis-class] or [list] of [Luminescence::RLum.Analysis-class]
+#' (**required**):
 #' Data set of one or multiple CW-OSL measured aliquots. The data set must either
 #' contain a list element `$OSL_COMPONENTS` or the parameter `decay_rates` must
 #' be defined.
 #'
 #' @param record_type [character] (*with default*):
-#' Type of records, selected by the [RLum.Analysis-class] attribute `@recordType`.
+#' Type of records, selected by the [Luminescence::RLum.Analysis-class] attribute `@recordType`.
 #' Common are: `"OSL"`,`"SGOSL"` or `"IRSL"`.
 #'
 #' @param K [numeric] (*with default*):
@@ -68,7 +68,7 @@
 #' If set to `TRUE` a browser window displaying the report will be opened automatically.
 #'
 #' @param rmd_path [character] (*with default*):
-#' **For advanced users:** File path to the [rmarkdown] source code file of the report.
+#' **For advanced users:** File path to the [rmarkdown::rmarkdown-package] source code file of the report.
 #' This allows to execute a manipulated version of the report.
 #'
 #' @param verbose [logical] (*with default*):
@@ -77,7 +77,7 @@
 #'
 #' @section Last updates:
 #'
-#' 2022-05-02, DM: Added new parameter `open_report` to give control over automatic browser opening
+#' 2023-09-01, DM: Improved input checks to return more helpful messages
 #'
 #' @author
 #' Dirk Mittelstrass, \email{dirk.mittelstrass@@luminescence.de}
@@ -99,7 +99,7 @@
 #'
 #' @return
 #'
-#' The input `object`, a [list] of [RLum.Analysis-class] objects is returned but with
+#' The input `object`, a [list] of [Luminescence::RLum.Analysis-class] objects is returned but with
 #' a new list element `object[["DECOMPOSITION"]]`, containing:
 #'
 #' \itemize{
@@ -108,7 +108,7 @@
 #'   \item `$parameters` [list]: Input and algorithm parameters
 #' }
 #'
-#' The [RLum.Data.Curve-class] attribute `@info` of each CW-OSL record contains the
+#' The [Luminescence::RLum.Data.Curve-class] attribute `@info` of each CW-OSL record contains the
 #' new entry `$COMPONENTS` with the curve-individual signal component parameters.
 #' It can be read for example by:
 #'
@@ -146,6 +146,7 @@ RLum.OSL_decomposition <- function(
   # * 2020-11-23, SK: Moved report call into utils.R
   # * 2021-02-15, DM: Added new parameter `rmd_path`
   # * 2022-05-02, DM: Added new parameter `open_report` to give control over automatic browser opening
+  # * 2023-09-01, DM: Improved input checks to return more helpful messages
   #
   ### ToDo's
   # * read 'lambda.error' if available and transfer it to decompose_OSLcurve for better error calculation
@@ -157,7 +158,6 @@ RLum.OSL_decomposition <- function(
   background_fitting <- FALSE
   error_calculation <- "empiric" # "poisson", "empiric", "nls", numeric value
 
-
   # get name of the input object
   object_name <- deparse(substitute(object))
 
@@ -165,7 +165,7 @@ RLum.OSL_decomposition <- function(
   data_set <- list()
   data_set_overhang <- list()
 
-  # Test if input object is a list
+  # Test if object is a list. If not, create a list
   if (is.list(object)) {
 
     for (i in 1:length(object)) {
@@ -173,29 +173,34 @@ RLum.OSL_decomposition <- function(
       if (inherits(object[[i]], "RLum.Analysis")) {
 
         data_set[[length(data_set) + 1]] <- object[[i]]
-
       } else {
 
         element_name <- names(object)[i]
-        if (element_name == "DECOMPOSITION") {
-          warning("Input object contained already Step 2 results (list element '$DECOMPOSITION'). Old results overwritten!")
+        if (is.null(element_name)){
+
+          cat("List element no. ", i, " is not of type 'RLum.Analysis' and was removed from from the data set.\n")
+
+        } else if (element_name == "DECOMPOSITION") {
+
+          cat("Data set was already decomposed by [RLum.OSL_global_fitting()]. Old results in $DECOMPOSITION were overwritten.\n")
+
         } else {
 
           data_set_overhang[[element_name]] <- object[[i]]
           if (!((element_name == "OSL_COMPONENTS")  || (element_name=="CORRECTION"))) {
-            warning("Input object list element ", i, " is not of type 'RLum.Analysis' and was included in the decomposition procedure, but was appended to the result list")}}}}
+            cat("List element ", element_name, " is not of type 'RLum.Analysis' and was not included in the procedure but remained in the data set.\n")}}}}
 
   } else {
 
-    if (inherits(object, "RLum.Analysis")) {
+    if (inherits(object, "Risoe.BINfileData")) {
+      stop(paste("Data is of type 'Risoe.BINfileData' instead of type 'RLum.Analysis'.",
+                 "Please apply the Luminescence package function Risoe.BINfileData2RLum.Analysis()",
+                 "to the data or ensure that read_BIN2R() has 'fastForward = TRUE' set."))}
 
-      data_set <- list(object)
-    } else {
-      stop("Input object is not a RLum.Analysis object nor a list of RLum.Analysis objects ")
-    }
-  }
+    data_set <- list(object)
+    warning("Input was not of type list, but output is of type list.")}
 
-  if (length(data_set) == 0) stop("Input object contains no RLum.Analysis data")
+  if (length(data_set) == 0) stop("Input data contains no RLum.Analysis objects. Please check if the data import was done correctly.")
 
   ################### Find out, which algorithm to use ###################
 

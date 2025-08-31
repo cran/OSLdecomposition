@@ -1,12 +1,13 @@
-#' Check and correct CW-OSL curves in RLum.Analysis data sets
+#' @title Check and correct CW-OSL curves in RLum.Analysis data sets
 #'
-#' CW-OSL measurements are often affected by background signals or might be measured under
+#' @description CW-OSL measurements are often affected by background signals or might be measured under
 #' inconsistent detection settings. This function provides tools
 #' to test and solve some common problems.
 #'
-#' This function processes data sets created within the [Luminescence-package] (Kreutzer et al. 2012).
-#' Those data sets must be formatted as [RLum.Analysis-class] objects. Output objects will also be
-#' [RLum.Analysis-class] objects and are meant for further analysis with [RLum.OSL_global_fitting].
+#' This function processes data sets created within the [Luminescence::Luminescence-package]
+#' (Kreutzer et al. 2012).
+#' Those data sets must be formatted as [Luminescence::RLum.Analysis-class] objects. Output objects will also be
+#' [Luminescence::RLum.Analysis-class] objects and are meant for further analysis with [RLum.OSL_global_fitting].
 #'
 #' The data preparation tools are executed in the following order:
 #' \enumerate{
@@ -56,7 +57,8 @@
 #' | 1000000 cts/s | 1018330 cts/s | 1.83 %
 #'
 #'
-#' @param object [RLum.Analysis-class] or [list] of [RLum.Analysis-class] (**required**):
+#' @param object [Luminescence::RLum.Analysis-class] or [list] of [Luminescence::RLum.Analysis-class]
+#' (**required**):
 #' Data set of one or multiple CW-OSL measured aliquots.
 #'
 #' @param record_type [character] (*with default*):
@@ -105,7 +107,7 @@
 #'
 #' @section Last updates:
 #'
-#' 2022-01-02, DM: Revised `PMT_pulse_pair_resolution` algorithm.
+#' 2023-09-01, DM: Improved input checks to return more helpful messages
 #'
 #' @author
 #' Dirk Mittelstrass, \email{dirk.mittelstrass@@luminescence.de}
@@ -130,7 +132,7 @@
 #'
 #' @return
 #'
-#' The input `object`, a [list] of [RLum.Analysis-class] objects, is given back with eventual changes
+#' The input `object`, a [list] of [Luminescence::RLum.Analysis-class] objects, is given back with eventual changes
 #' in the elements `object[[]]@records[[]]@recordType` and `object[[]]@records[[]]@data`.
 #'
 #' The returned data set contains a new list element `object[["CORRECTION"]]` which provides
@@ -176,6 +178,8 @@ RLum.OSL_correction <- function(
   # * 2021-02-15, DM: Enabled `remove_light_off` and renamed `cut_records` into `limit_duration`. Removed `report` parameter
   # * 2021-11-23, DM: Added pulse-pair-resolution correction
   # * 2022-01-02, DM: Revised `PMT_pulse_pair_resolution` algorithm.
+  # * 2023-07-15, DM: Bugfix in remove_light_off
+  # * 2023-09-01, DM: Improved input checks to return more helpful messages
   #
   # ToDo:
   # * Check for Zero as first value at the time axis
@@ -216,21 +220,30 @@ RLum.OSL_correction <- function(
       } else {
 
         element_name <- names(object)[i]
-        if (element_name == "CORRECTION") {
-          warning("Data set was already manipulated by [RLum.OSL_correction()]. Old information in $CORRECTION were overwritten")
+        if (is.null(element_name)){
+
+          cat("List element no. ", i, " is not of type 'RLum.Analysis' and was removed from from the data set.\n")
+
+          } else if (element_name == "CORRECTION") {
+
+          cat("Data set was already manipulated by [RLum.OSL_correction()]. Old information in $CORRECTION were overwritten.\n")
 
           } else {
 
             data_set_overhang[[element_name]] <- object[[i]]
-            warning("List element ", i, " is not of type 'RLum.Analysis' and was not included in fitting procedure")}}}
-
+            cat("List element ", element_name, " is not of type 'RLum.Analysis' and was not included in the procedure but remained in the data set.\n")}}}
 
   } else {
 
-    data_set <- list(object)
-    warning("Input was not of type list, but output is of type list")}
+    if (inherits(object, "Risoe.BINfileData")) {
+      stop(paste("Data is of type 'Risoe.BINfileData' instead of type 'RLum.Analysis'.",
+                 "Please apply the Luminescence package function Risoe.BINfileData2RLum.Analysis()",
+                 "to the data or ensure that read_BIN2R() has 'fastForward = TRUE' set."))}
 
-  if (length(data_set) == 0) stop("Input object contains no RLum.Analysis data")
+    data_set <- list(object)
+    warning("Input was not of type list, but output is of type list.")}
+
+  if (length(data_set) == 0) stop("Input data contains no RLum.Analysis objects. Please check if the data import was done correctly.")
 
   if (!(check_consistency) && !(is.null(background_sequence))) {
     stop("Background correction requires consistent data! Please set 'check_consistency=TRUE' and try again.")}
@@ -249,7 +262,7 @@ RLum.OSL_correction <- function(
     # measure computing time
     time.start <- Sys.time()
 
-    # Characteristics vector. Will be extentable later
+    # Characteristics vector. Will be extendable later
     Cvector <- c("Channels", "Channel width")
 
     ### Build table ###
@@ -350,19 +363,20 @@ RLum.OSL_correction <- function(
 
     # Where is the maximum in the first half?
     ref_curve_max <- max(ref_curve$signal[1:ceiling(ref_length / 2)])
-    light_on <- which(ref_curve$signal == ref_curve_max)
-
+    light_on <- which(ref_curve$signal == ref_curve_max)[1]
 
     # To get the light-off time, we calculate the second differential
-    # Its minimum ist that negative curvature data point which is caused by the light-off event
+    # Its minimum is that negative curvature data point which is caused by the light-off event
     ref_diff2 <-  c(diff(c(0, diff(ref_curve$signal))), 0)
     ref_diff2_min <- min(ref_diff2[floor(ref_length / 2):ref_length])
 
     light_off <- which(ref_diff2 == ref_diff2_min)
+    light_off <- light_off[length(light_off)]
 
     # be sure, the light-off event is not just a noise artifact ...
-    if ((ref_diff2_min >= 0) |
-        (ref_curve$signal[light_off] < 2 * ref_curve$signal[light_off + 1])) {
+    if ((light_off < ref_length) &&
+        ((ref_diff2_min >= 0) |
+        (ref_curve$signal[light_off] < 2 * ref_curve$signal[light_off + 1]))) {
 
       # ... or set end of stimulation equal to end of the measurement
       light_off <- ref_length}

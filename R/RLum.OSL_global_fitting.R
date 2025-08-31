@@ -1,9 +1,9 @@
-#' Identify CW-OSL signal components in RLum.Analysis data sets
+#' @title Identify CW-OSL signal components in RLum.Analysis data sets
 #'
-#' First, all CW-OSL records are combined to one global average CW-OSL curve,
+#' @description First, all CW-OSL records are combined to one global average CW-OSL curve,
 #' then the multi-exponential fitting approach of Bluszcz and Adamiec (2006) is applied.
-#' This function processes [RLum.Analysis-class] data sets created within
-#' the [Luminescence-package] (Kreutzer et al. 2012).
+#' This function processes [Luminescence::RLum.Analysis-class] data sets created within
+#' the [Luminescence::Luminescence-package] (Kreutzer et al. 2012).
 #'
 #' The workflow of this function is as follows:
 #'
@@ -13,12 +13,12 @@
 #'   \item Create a `html` report to summarize the results (*optional*).
 #'}
 #'
-#' Data sets must be formatted as [RLum.Analysis-class] objects and
+#' Data sets must be formatted as [Luminescence::RLum.Analysis-class] objects and
 #' should have been processed with [RLum.OSL_correction] beforehand.
-#' Output objects are also [RLum.Analysis-class] objects and are
+#' Output objects are also [Luminescence::RLum.Analysis-class] objects and are
 #' meant for further analysis with [RLum.OSL_decomposition].
 #'
-#' If `report = TRUE`, a `html` report of the results is rendered by the [rmarkdown-package]
+#' If `report = TRUE`, a `html` report of the results is rendered by the [rmarkdown::rmarkdown-package]
 #' and saved in the working directory, which is usually the directory of the data file.
 #' This report can be displayed, shared and published online without any requirements to
 #' the operation system or installed software. However, an internet connection is needed to display
@@ -29,11 +29,11 @@
 #'
 #'
 #'
-#' @param object [RLum.Analysis-class] or [list] of [RLum.Analysis-class] (**required**):
+#' @param object [Luminescence::RLum.Analysis-class] or [list] of [Luminescence::RLum.Analysis-class] (**required**):
 #' Data set of one or multiple CW-OSL measured aliquots.
 #'
 #' @param record_type [character] (*with default*):
-#' Type of records, selected by the [RLum.Analysis-class] attribute `@recordType`.
+#' Type of records, selected by the [Luminescence::RLum.Analysis-class] attribute `@recordType`.
 #' Common are: `"OSL"`,`"SGOSL"` or `"IRSL"`.
 #'
 #' @param K_maximum [numeric] (*with default*):
@@ -68,7 +68,7 @@
 #' If set to `TRUE` a browser window displaying the report will be opened automatically.
 #'
 #' @param rmd_path [character] (*with default*):
-#' **For advanced users:** File path to the [rmarkdown] source code file of the report.
+#' **For advanced users:** File path to the [rmarkdown::rmarkdown-package] source code file of the report.
 #' This allows to execute manipulated versions of the report.
 #'
 #' @param verbose [logical] (*with default*):
@@ -77,7 +77,7 @@
 #'
 #' @section Last updates:
 #'
-#' 2022-05-02, DM: Added new parameter `open_report` to give control over automatic browser opening
+#' 2023-09-01, DM: Improved input checks to return more helpful messages
 #'
 #' @author
 #' Dirk Mittelstrass, \email{dirk.mittelstrass@@luminescence.de}
@@ -99,7 +99,7 @@
 #'
 #' @return
 #'
-#' The input `object`, a [list] of [RLum.Analysis-class] objects is returned but with
+#' The input `object`, a [list] of [Luminescence::RLum.Analysis-class] objects is returned but with
 #' a new list element `object[["OSL_COMPONENTS"]]`, containing:
 #' \itemize{
 #'   \item `$decay.rates` [numeric] vector: Decay rates of F-test recommendation or last successful fitting.
@@ -157,6 +157,7 @@ RLum.OSL_global_fitting <- function(object,
   # * 2020-11-23, SK: Moved report call into utils.R
   # * 2021-02-15, DM: Added new parameter `rmd_path`
   # * 2022-05-02, DM: Added new parameter `open_report` to give control over automatic browser opening
+  # * 2023-09-01, DM: Improved input checks to return more helpful messages
   #
   # ToDo:
   # * Get stimulation.intensity from @info[["LPOWER"]]
@@ -184,22 +185,31 @@ RLum.OSL_global_fitting <- function(object,
       } else {
 
         element_name <- names(object)[i]
+        if (is.null(element_name)){
 
-        if (element_name == "OSL_COMPONENTS") {
+          cat("List element no. ", i, " is not of type 'RLum.Analysis' and was removed from from the data set.\n")
 
-          warning("Input object already contains Step 1 results. Old results were overwritten")
-        }else{
+        } else if (element_name == "OSL_COMPONENTS") {
+
+          cat("Data set was already fitted by [RLum.OSL_global_fitting()]. Old results in $OSL_COMPONENTS were overwritten.\n")
+
+        } else {
 
           data_set_overhang[[element_name]] <- object[[i]]
           if (!((element_name == "DECOMPOSITION")  || (element_name=="CORRECTION"))) {
-            warning("Input object list element ", i, " is not of type 'RLum.Analysis' and was included in the fitting procedure, but was appended to the result list")}}}}
+            cat("List element ", element_name, " is not of type 'RLum.Analysis' and was not included in the procedure but remained in the data set.\n")}}}}
 
   } else {
 
-    data_set <- list(object)
-    warning("Input is not of type list, but output is of type list")}
+    if (inherits(object, "Risoe.BINfileData")) {
+      stop(paste("Data is of type 'Risoe.BINfileData' instead of type 'RLum.Analysis'.",
+                 "Please apply the Luminescence package function Risoe.BINfileData2RLum.Analysis()",
+                 "to the data or ensure that read_BIN2R() has 'fastForward = TRUE' set."))}
 
-  if (length(data_set) == 0) stop("Input object contains no RLum.Analysis data")
+    data_set <- list(object)
+    warning("Input was not of type list, but output is of type list.")}
+
+  if (length(data_set) == 0) stop("Input data contains no RLum.Analysis objects. Please check if the data import was done correctly.")
 
   # calc arithmetic mean curve
   if(verbose) cat("STEP 1.1 ----- Build global average curve from all CW-OSL curves -----\n")
