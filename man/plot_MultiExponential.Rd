@@ -88,7 +88,7 @@ Anchor point for positioning the legend (for example \code{"right"} or \code{c(1
 This argument is forwarded to \link[ggplot2:theme]{ggplot2::theme}.}
 
 \item{theme.set}{\link[ggplot2:ggplot2-package]{ggplot2::ggplot2-package} object (\emph{with default}):
-Graphical theme of the output plot. This argument is forwarded to \link[ggplot2:theme_get]{ggplot2::theme_set}.
+Graphical theme of the output plot. This argument is forwarded to \link[ggplot2:get_theme]{ggplot2::theme_set}.
 Recommended themes are \code{ggplot2::theme_minimal()}, \code{ggplot2::theme_classic()} and \code{ggplot2::theme_bw()},
 see \link[ggplot2:ggtheme]{ggplot2::theme_bw} or \href{https://ggplot2.tidyverse.org/reference/ggtheme.html}{here} for
 a full list.}
@@ -150,9 +150,5 @@ Radiation Measurements, 32(2)
 \author{
 Dirk Mittelstraß, \email{dirk.mittelstrass@luminescence.de}
 
-Please add the following references to your publication: Your currently used package version, obtained by
-\code{citation("OSLdecomposition")}
-
-Mittelstraß, D., Schmidt, C., Kreutzer, S., Beyer, J., Straessner, A. and Heitmann, J.:
-R package OSLdecomposition: Automated signal component analysis of multi-exponential decays for optically stimulated luminescence applications., \emph{in preparation}.
+Please cite this package, including its version number. Enter the command \code{citation("OSLdecomposition")} to generate the correct reference.
 }

@@ -13,6 +13,7 @@
 #' \enumerate{
 #'   \item{`check_consistency`}
 #'   \item{`remove_light_off`}
+#'   \item{`normalize_x_axis`}
 #'   \item{`limit_duration`}
 #'   \item{`PMT_pulse_pair_resolution`}
 #'   \item{`background_sequence`}
@@ -65,17 +66,6 @@
 #' Type of records selected from the input `object`, see
 #' `object[[]]@records[[]]@recordType`. Common are: `"OSL"`,`"SGOSL"` or `"IRSL"`.
 #'
-#' @param background_sequence [numeric] vector (*optional*):
-#' Indices of list items with CW-OSL measurements of empty aliquots.
-#' The records in these list items are used to calculate one average CW-OSL background curve
-#' with [sum_OSLcurves]. This background curve is subtracted from each
-#' CW-OSL record of the data set. The attributes `@recordType` of the background
-#' measurements will be renamed to `"{record_type}background"`.
-#'
-#' @param subtract_offset [numeric] (*optional*):
-#' Signal offset value in counts per second (*cts/s*). Value is handled as background
-#' level and will be subtracted from each CW-OSL record.
-#'
 #' @param check_consistency [logical] (*with default*):
 #' The CW-OSL component identification and separation procedure requires uniform detection parameters
 #' throughout the whole data set. If `TRUE`, all records are compared for their
@@ -87,6 +77,11 @@
 #' @param remove_light_off [logical] (*with default*):
 #' Checks if the records contain zero-signal intervals at beginning and/or end of the
 #' measurement and removes them. Useful to tailor single-grain measurements.
+#'
+#' @param normalize_x_axis [logical] (*with default*):
+#' Checks if first x-axis value is equal the channel width value. If not, shift the x-axis
+#' accordingly. This way, correct x values are ensured for [fit_OSLcurve] and [decompose_OSLcurve]
+#' are ensured.
 #'
 #' @param limit_duration [numeric] (*with default*):
 #' Reduce measurement duration to input value in seconds (*s*).
@@ -101,21 +96,33 @@
 #' non-linearity at height counting rates, see *Details*.
 #' Set `PMT_pulse_pair_resolution = NA` if algorithm shall be omitted.
 #'
+#' @param background_sequence [numeric] vector (*optional*):
+#' Indices of list items with CW-OSL measurements of empty aliquots.
+#' The records in these list items are used to calculate one average CW-OSL background curve
+#' with [sum_OSLcurves]. This background curve is subtracted from each
+#' CW-OSL record of the data set. The attributes `@recordType` of the background
+#' measurements will be renamed to `"{record_type}background"`.
+#'
+#' @param subtract_offset [numeric] (*optional*):
+#' Signal offset value in counts per second (*cts/s*). Value is handled as background
+#' level and will be subtracted from each CW-OSL record.
+#'
 #' @param verbose [logical] (*with default*):
 #' Enables console text output.
 #'
 #'
 #' @section Last updates:
 #'
-#' 2023-09-01, DM: Improved input checks to return more helpful messages
+#' 2026-03-02, DM:
+#' * Test if more than zero suitable records of the 'record_type' are in the data set
+#' * Made pattern matching of 'record_type' with '@recordType' slot ready for Luminescence package 1.2
+#' * Improved input data checks
+#' * Existing RLum.OSL result data is now removed with each execution of this function
 #'
 #' @author
 #' Dirk Mittelstrass, \email{dirk.mittelstrass@@luminescence.de}
 #'
-#' Please cite the package the following way:
-#'
-#' Mittelstraß, D., Schmidt, C., Beyer, J., Heitmann, J. and Straessner, A.:
-#' R package OSLdecomposition: Automated identification and separation of quartz CW-OSL signal components, *in preparation*.
+#' Please cite this package, including its version number. Enter the command `citation("OSLdecomposition")` to generate the correct reference.
 #'
 #' @seealso [RLum.OSL_global_fitting], [RLum.OSL_decomposition], [sum_OSLcurves]
 #'
@@ -163,12 +170,13 @@
 RLum.OSL_correction <- function(
   object,
   record_type = "OSL",
-  background_sequence = NULL,
-  subtract_offset = 0,
   check_consistency = TRUE,
   remove_light_off = TRUE,
+  normalize_x_axis = TRUE,
   limit_duration = 20,
   PMT_pulse_pair_resolution = 18,
+  background_sequence = NULL,
+  subtract_offset = 0,
   verbose = TRUE
 ){
 
@@ -180,10 +188,17 @@ RLum.OSL_correction <- function(
   # * 2022-01-02, DM: Revised `PMT_pulse_pair_resolution` algorithm.
   # * 2023-07-15, DM: Bugfix in remove_light_off
   # * 2023-09-01, DM: Improved input checks to return more helpful messages
+  # * 2025-09-23, DM: Added normalize_x_axis algorithm
+  # * 2026-02-25, DM: Test if more than zero suitable records of the 'record_type' are in the data set
+  # * 2026-02-26, DM: Made pattern matching of 'record_type' with '@recordType' slot ready for Luminescence package 1.2
+  # * 2026-03-02, DM: Improved input data checks
+  # * 2026-03-02, DM: Existing RLum.OSL result data is now removed with each execution of this function
   #
   # ToDo:
-  # * Check for Zero as first value at the time axis
+  # * Write module test
+  # * use new function from Luminescence package for PMT linearity correction
   # * enhance 'check_consistency' to accept vectors of @info-arguments, include LPOWER and LIGHTSOURCE per default and print arguments
+  #   use check_RLum.Data for this
   # * enhance 'background' to accept whole RLum objects
   # * deploy Luminescence::verify_SingleGrainData() for 'check_single_grain_signal'
   # * handle previous CORRECTION steps
@@ -191,6 +206,7 @@ RLum.OSL_correction <- function(
   # * IMPORTANT: If a RLum.object is manipulated, change its @info accordingly
   # * The routine for 'remove_light_off' is quite slow and needs performance improvement
 
+verbose_performance <- FALSE
 
   ##########################
   #### Data preparation ####
@@ -209,9 +225,8 @@ RLum.OSL_correction <- function(
                                      background_sequence = background_sequence,
                                      subtract_offset = subtract_offset))
 
-  # Test if object is a list. If not, create a list
+  # Test if object is a list of RLum.Analysis objects
   if (is.list(object)) {
-
     for (i in 1:length(object)) {
 
       if (inherits(object[[i]], "RLum.Analysis")) {
@@ -220,34 +235,59 @@ RLum.OSL_correction <- function(
       } else {
 
         element_name <- names(object)[i]
+        allowed <- c("Sequence.Header", "FITTING", "CORRECTION")
+        not_allowed <- c("DECOMPOSITION")
+
         if (is.null(element_name)){
+          cat("List element no.", i, "is not of type 'RLum.Analysis' and is removed from the data set.\n")
 
-          cat("List element no. ", i, " is not of type 'RLum.Analysis' and was removed from from the data set.\n")
+        } else if (element_name %in% not_allowed) {
+          cat("Removed old list element", element_name, "to circumvent misleading results.\n")
 
-          } else if (element_name == "CORRECTION") {
+        } else if (element_name %in% allowed) {
+          data_set_overhang[[element_name]] <- object[[i]]
 
-          cat("Data set was already manipulated by [RLum.OSL_correction()]. Old information in $CORRECTION were overwritten.\n")
+        } else{
+          cat("List element", paste0("\"", element_name, "\""), "is not of type 'RLum.Analysis' and removed from the data set.\n")
+        }
+      }
+    }
 
-          } else {
+  } else if (inherits(object, "Risoe.BINfileData")) {
+    stop(paste("Data is of type 'Risoe.BINfileData' instead of type 'RLum.Analysis'.",
+               "Please apply the Luminescence package function Risoe.BINfileData2RLum.Analysis()",
+               "to the data or ensure that read_BIN2R() has 'fastForward = TRUE' set."))
 
-            data_set_overhang[[element_name]] <- object[[i]]
-            cat("List element ", element_name, " is not of type 'RLum.Analysis' and was not included in the procedure but remained in the data set.\n")}}}
+  } else if (inherits(object, "RLum.Analysis")) {
+    data_set <- list(object)
+    warning("Input was not of type list, but output is of type list.")
 
   } else {
-
-    if (inherits(object, "Risoe.BINfileData")) {
-      stop(paste("Data is of type 'Risoe.BINfileData' instead of type 'RLum.Analysis'.",
-                 "Please apply the Luminescence package function Risoe.BINfileData2RLum.Analysis()",
-                 "to the data or ensure that read_BIN2R() has 'fastForward = TRUE' set."))}
-
-    data_set <- list(object)
-    warning("Input was not of type list, but output is of type list.")}
+    stop(paste("Invalid data type: Input object need to be a list of RLum.Analysis objects.",
+               "Instead it is of type", class(object)[1]))
+  }
 
   if (length(data_set) == 0) stop("Input data contains no RLum.Analysis objects. Please check if the data import was done correctly.")
 
   if (!(check_consistency) && !(is.null(background_sequence))) {
     stop("Background correction requires consistent data! Please set 'check_consistency=TRUE' and try again.")}
 
+  if (grepl("TL", record_type) && normalize_x_axis) {
+    warning("It is not recommended to normalize the X-axis for TL measurements. Temperature information may get lost.")}
+
+  # Preliminary test if any record has the set record_type
+  no_records <- 0
+  for (j in 1:length(data_set)) {
+    for (i in 1:length(data_set[[j]]@records)) {
+      if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE))
+        no_records <- no_records + 1
+    }
+  }
+  if (no_records == 0) {
+    warning("No record is of the record type", paste0("'", record_type, "'."), "Dataset is returned without correction.")
+    object <- c(data_set, data_set_overhang)
+    invisible(object)
+  }
 
   ########################
   #### Start workflow ####
@@ -257,7 +297,7 @@ RLum.OSL_correction <- function(
 
   if (check_consistency) {
     correction_step <- correction_step + 1 #########################################################
-    if(verbose) cat("CORRECTION STEP", correction_step, "----- Check records for consistency in the detection settings -----\n")
+    if(verbose) cat("CORRECTION", correction_step, "----- Check records for consistency in the detection settings -----\n")
 
     # measure computing time
     time.start <- Sys.time()
@@ -269,7 +309,7 @@ RLum.OSL_correction <- function(
     Ctable <- data.frame(NULL)
     for (j in 1:length(data_set)) {
       for (i in 1:length(data_set[[j]]@records)) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           channels <- length(data_set[[j]]@records[[i]]@data[,1])
           channel_width <- data_set[[j]]@records[[i]]@data[,1][2] - data_set[[j]]@records[[i]]@data[,1][1]
@@ -305,7 +345,7 @@ RLum.OSL_correction <- function(
       Cstats$record_type <- record_type
       Cstats$record_type[2:N] <- paste0(record_type, 2:N)
 
-      # Insert new levels in OSL record type colection
+      # Insert new levels in OSL record type collection
       levels(Ctable$record_type) <- Cstats$record_type
 
 
@@ -335,23 +375,24 @@ RLum.OSL_correction <- function(
       if(verbose) cat("RLum.Data.Curve@RecordType changed to",
                       paste(paste0(record_type, 2:N), collapse = " or "),
                       "in sequence:", paste(sequences_with_replacements, collapse = ", "), "\n")
-      if(verbose) cat("Further data manipulations are performed just on", record_type,"records\n")
+      if(verbose) cat("Further data manipulations are performed just on", record_type,"records.\n")
 
     } else {
 
-      if(verbose) cat("All", record_type, "records have the same detection settings\n")}
+      if(verbose) cat("All", record_type, "records have the same detection settings.\n")}
 
     cor_data <- c(cor_data, list(measurement_characteristics = Ctable,
                             character_statistics = Cstats))
 
 
     # print needed computing time
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
   }
 
   if (remove_light_off) {
     correction_step <- correction_step + 1 ########################################################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Remove not stimulated measurement parts -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Remove not stimulated measurement parts -----\n")
     time.start <- Sys.time()
 
     # Algorithm: (1) Create a global reference curve of all [record_type] curves
@@ -393,7 +434,7 @@ RLum.OSL_correction <- function(
       # go through all records
       for (j in 1:length(data_set)) {
         for (i in c(1:length(data_set[[j]]@records))) {
-          if (data_set[[j]]@records[[i]]@recordType == record_type) {
+          if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
             # read record
             time <- data_set[[j]]@records[[i]]@data[,1]
@@ -408,7 +449,6 @@ RLum.OSL_correction <- function(
 
             records_changed <- records_changed + 1 }}}
 
-
       # write console output
       if(verbose) {
 
@@ -422,20 +462,57 @@ RLum.OSL_correction <- function(
             ref_curve$time[length(stimulated)], "s\n")}
     }
 
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
+  }
+
+  if (normalize_x_axis) {
+    correction_step <- correction_step + 1 ########################################################
+    if(verbose) cat("CORRECTION", correction_step, "----- Normalize x-axis -----\n")
+    time.start <- Sys.time()
+    records_changed <- 0
+
+    # go through all records
+    for (j in 1:length(data_set)) {
+      for (i in c(1:length(data_set[[j]]@records))) {
+
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
+
+          # read record
+          time <- data_set[[j]]@records[[i]]@data[,1]
+          signal <- data_set[[j]]@records[[i]]@data[,2]
+
+          channel_width <- time[2] - time[1]
+          if (time[1] != channel_width) {
+            time <- time - time[1] + channel_width
+
+            # write record
+            data_set[[j]]@records[[i]]@data <- matrix(c(time, signal), ncol = 2)
+            records_changed <- records_changed + 1
+
+          }}}}
+
+      # write console output
+      if(verbose) {
+        if (records_changed > 0) {
+          cat("Shifted x-axis of ",records_changed ,"records to start with first value equal the channel width.\n")
+        }else{
+          cat("First x-axis value is already equal channel width value for all records.\n")}}
 
 
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")}
-
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
+  }
 
   if (is.numeric(limit_duration) && (limit_duration > 0)) {
     correction_step <- correction_step + 1 ########################## CUT ###############################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Limit measurement duration -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Limit measurement duration -----\n")
     time.start <- Sys.time()
     records_changed <- 0
 
     for (j in 1:length(data_set)) {
       for (i in c(1:length(data_set[[j]]@records))) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           time <- data_set[[j]]@records[[i]]@data[,1]
           signal <- data_set[[j]]@records[[i]]@data[,2]
@@ -458,12 +535,13 @@ RLum.OSL_correction <- function(
       if(verbose) cat("Reduced length of", records_changed, record_type, "records from",
                       before, "s to", after, "s\n")}
 
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
   }
 
   if (is.numeric(PMT_pulse_pair_resolution) && (PMT_pulse_pair_resolution > 0)) {
     correction_step <- correction_step + 1 ######################### PMT PULSE-PAIR RESOLUTION ################################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Correct for PMT pulse-pair resolution -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Correct for PMT pulse-pair resolution -----\n")
     time.start <- Sys.time()
     # See Hamamatsu PMT handbook chapter 6.3 section 2c for details
 
@@ -482,7 +560,7 @@ RLum.OSL_correction <- function(
 
     for (j in 1:length(data_set)) {
       for (i in c(1:length(data_set[[j]]@records))) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           time <- data_set[[j]]@records[[i]]@data[,1]
           signal <- data_set[[j]]@records[[i]]@data[,2]
@@ -532,28 +610,28 @@ RLum.OSL_correction <- function(
       if(verbose) cat("No records exceeding the signal limits found.\n")
     }
 
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
   }
 
   if (!(is.null(background_sequence) || is.na(background_sequence))
       && is.vector(background_sequence)
       && (all(background_sequence> 0) ) && (all(background_sequence<= length(data_set)))) {
     correction_step <- correction_step + 1 ######################### BACKGROUND ################################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Subtract background measurement -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Subtract background measurement -----\n")
     time.start <- Sys.time()
-
 
     N <- 0
     # create background curve
     background_curve <- sum_OSLcurves(data_set, record_type,
-                             aliquot_selection = background_sequence,
+                             selection = background_sequence,
                              output.plot = FALSE,
                              verbose = TRUE)
 
     # rename background OSL curves
     for (j in background_sequence) {
       for (i in c(1:length(data_set[[j]]@records))) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           N <- N + 1
           data_set[[j]]@records[[i]]@recordType <- paste0(record_type, "background")}}}
@@ -565,7 +643,7 @@ RLum.OSL_correction <- function(
     # subtract background curve
     for (j in 1:length(data_set)) {
       for (i in c(1:length(data_set[[j]]@records))) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           time <- data_set[[j]]@records[[i]]@data[,1]
           signal <- data_set[[j]]@records[[i]]@data[,2]
@@ -578,7 +656,8 @@ RLum.OSL_correction <- function(
     cor_data <- c(cor_data, list(background_curve = background_curve))
 
     if(verbose) cat("Background saved at @CORRECTION@background_curve\n")
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
 
   } else {
     if (!(is.null(background_sequence))) {
@@ -589,7 +668,7 @@ RLum.OSL_correction <- function(
 
   if (FALSE) {
     correction_step <- correction_step + 1 ######################### NOISE LEVEL CHECK ################################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Check measurements for sufficient signal levels -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Check measurements for sufficient signal levels -----\n")
     time.start <- Sys.time()
 
     # Roxygen2 Text:
@@ -605,18 +684,19 @@ RLum.OSL_correction <- function(
     #
     # Alternatively: Use the function from the Luminescence package: verify_SingleGrainData()
 
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
   }
 
 
   if (subtract_offset != 0) {
     correction_step <- correction_step + 1 ######################### OFFSET ################################
-    if(verbose) cat("CORRECTION STEP", correction_step,"----- Subtract offset value -----\n")
+    if(verbose) cat("CORRECTION", correction_step,"----- Subtract offset value -----\n")
     time.start <- Sys.time()
 
     for (j in 1:length(data_set)) {
       for (i in c(1:length(data_set[[j]]@records))) {
-        if (data_set[[j]]@records[[i]]@recordType == record_type) {
+        if (check_RLum.Data(data_set[[j]]@records[[i]], record_type, verbose = FALSE)) {
 
           time <- data_set[[j]]@records[[i]]@data[,1]
           signal <- data_set[[j]]@records[[i]]@data[,2]
@@ -626,8 +706,8 @@ RLum.OSL_correction <- function(
           data_set[[j]]@records[[i]]@data <- matrix(c(time, signal), ncol = 2)}}}
 
     if(verbose) cat("Offset of", subtract_offset, "counts per second subtracted from every", record_type, "record\n")
-    if(verbose) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n\n")
-
+    if(verbose_performance) cat("(time needed:", round(as.numeric(difftime(Sys.time(), time.start, units = "s")), digits = 2),"s)\n")
+    if(verbose) cat("\n")
   }
 
   ################################ REPORT  ################################

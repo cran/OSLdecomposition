@@ -42,8 +42,7 @@ Dirk Mittelstraß, Independent researcher, Dresden (Germany),\cr
 
 \strong{Citation}
 
-Mittelstraß, D., Schmidt, C., Beyer, J., Heitmann, J. and Straessner, A.:
-R package OSLdecomposition: Automated identification and separation of quartz CW-OSL signal components, \emph{in preparation}.
+Please cite this package, including its version number. Enter the command \code{citation("OSLdecomposition")} to generate the correct reference.
 
 \strong{Funding}
 Dirk Mittelstraß created this package as part of his master thesis and further enhanced and
@@ -64,6 +63,7 @@ Authors:
 \itemize{
   \item Sebastian Kreutzer (\href{https://orcid.org/0000-0002-0734-2199}{ORCID})
   \item Christoph Schmidt (\href{https://orcid.org/0000-0002-2309-3209}{ORCID})
+  \item Marco Colombo (\href{https://orcid.org/0000-0001-6672-0623}{ORCID})
 }
 
 Other contributors:

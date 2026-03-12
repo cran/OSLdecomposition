@@ -7,7 +7,7 @@
 RLum.OSL_decomposition(
   object,
   record_type = "OSL",
-  K = 3,
+  K = NA,
   decay_rates = NULL,
   report = FALSE,
   report_dir = NULL,
@@ -21,7 +21,7 @@ RLum.OSL_decomposition(
 \item{object}{\link[Luminescence:RLum.Analysis-class]{Luminescence::RLum.Analysis} or \link{list} of \link[Luminescence:RLum.Analysis-class]{Luminescence::RLum.Analysis}
 (\strong{required}):
 Data set of one or multiple CW-OSL measured aliquots. The data set must either
-contain a list element \verb{$OSL_COMPONENTS} or the parameter \code{decay_rates} must
+contain a list element \verb{$FITTING} or the parameter \code{decay_rates} must
 be defined.}
 
 \item{record_type}{\link{character} (\emph{with default}):
@@ -29,7 +29,7 @@ Type of records, selected by the \link[Luminescence:RLum.Analysis-class]{Lumines
 Common are: \code{"OSL"},\code{"SGOSL"} or \code{"IRSL"}.}
 
 \item{K}{\link{numeric} (\emph{with default}):
-Number of components. Selects the according result table in the \verb{$OSL_COMPONENTS} list item of the data set \code{object}.}
+Number of components. Selects the according result table in the \verb{$FITTING} list item of the data set \code{object}.}
 
 \item{decay_rates}{\link{numeric} vector or \link{data.frame} (\emph{optional}):
 User-defined component decay rates. If this parameter is defined, the parameter \code{K} will ignored.
@@ -69,6 +69,7 @@ a new list element \code{object[["DECOMPOSITION"]]}, containing:
 \item \verb{$decompositon.input} \link{data.frame}: Set of input components. Relevant is just the column \verb{$lambda}
 \item \verb{$results} \link{data.frame}: Overview table of decomposition
 \item \verb{$parameters} \link{list}: Input and algorithm parameters
+\item \verb{$dominant.component} \link{character}: That component which has the most share in the initial signals
 }
 
 The \link[Luminescence:RLum.Data.Curve-class]{Luminescence::RLum.Data.Curve} attribute \verb{@info} of each CW-OSL record contains the
@@ -111,7 +112,16 @@ The \emph{Rmarkdown} source code of the report can be found with the following c
 \section{Last updates}{
 
 
-2023-09-01, DM: Improved input checks to return more helpful messages
+2026-03-11, DM:
+\itemize{
+\item Returns now some basic statistics about contribution of the components to the initial CW-OSL signal, see console output and \code{object$DECOMPOSITION$initial.signal.stats}
+\item The component which dominates the initial signal on average (highest median) is now stated as Dominating Component in console output and \code{object$DECOMPOSITION$dominating.component}
+\item Function no longer crashes if record data contains no \verb{@info$IRR_TIME} parameters.
+\item Default number of components 'K' if 'K' is not set is no longer 3. Instead 'K = length(decay_rates)' if 'decay_rates' are set, else 'K = $FITTING$K.selected'.
+\item Made pattern matching of 'record_type' with \verb{@recordType} slot ready for Luminescence package 1.2
+\item Improved input data checks
+\item Existing RLum.OSL decomposition results are now removed with each execution of this function
+}
 }
 
 \examples{
@@ -139,8 +149,5 @@ its application in retrospective dosimetry at quartz (Master thesis). TU Dresden
 \author{
 Dirk Mittelstrass, \email{dirk.mittelstrass@luminescence.de}
 
-Please cite the package the following way:
-
-Mittelstraß, D., Schmidt, C., Beyer, J., Heitmann, J. and Straessner, A.:
-R package OSLdecomposition: Automated identification and separation of quartz CW-OSL signal components, \emph{in preparation}.
+Please cite this package, including its version number. Enter the command \code{citation("OSLdecomposition")} to generate the correct reference.
 }

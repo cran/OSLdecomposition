@@ -96,10 +96,7 @@
 #' @author
 #' Dirk Mittelstraß, \email{dirk.mittelstrass@@luminescence.de}
 #'
-#' Please cite the package the following way:
-#'
-#' Mittelstraß, D., Schmidt, C., Beyer, J., Heitmann, J. and Straessner, A.:
-#' R package OSLdecomposition: Automated identification and separation of quartz CW-OSL signal components, *in preparation*.
+#' Please cite this package, including its version number. Enter the command `citation("OSLdecomposition")` to generate the correct reference.
 #'
 #' @seealso [fit_OSLcurve], [RLum.OSL_decomposition], [RLum.OSL_global_fitting], [simulate_OSLcomponents]
 #'
@@ -267,6 +264,7 @@ plot_OSLcurve <- function(curve = NULL,
 
     p.lin <- plot_MultiExponential(curve, components,
                                    main = title,
+                                   fill.components = TRUE,
                                    xlab = "Time (s)", ylab = "Signal (cts)",
                                    theme.set = theme.set,
                                    font.size = 8,
@@ -287,6 +285,7 @@ plot_OSLcurve <- function(curve = NULL,
 
     p.log  <- plot_MultiExponential(curve, components,
                                     main = title,
+                                    fill.components = FALSE,
                                     theme.set = theme.set,
                                     ylog = TRUE,
                                     font.size = 8,
@@ -305,6 +304,7 @@ plot_OSLcurve <- function(curve = NULL,
 
     p.loglog  <- plot_MultiExponential(curve, components,
                                        main = title,
+                                       fill.components = FALSE,
                                        theme.set = theme.set,
                                        ylog = TRUE, xlog = TRUE,
                                        font.size = 8,
@@ -324,6 +324,7 @@ plot_OSLcurve <- function(curve = NULL,
 
     p.LM  <- plot_MultiExponential(curve, components,
                                    main = title,
+                                   fill.components = FALSE,
                                    theme.set = theme.set,
                                    linear.modulation = TRUE,
                                    xlab = "Time (s)", ylab = "Signal (cts)",
@@ -352,6 +353,7 @@ plot_OSLcurve <- function(curve = NULL,
     # Plot residual curve
     p.res  <- plot_MultiExponential(res_curve,
                                     main = title,
+                                    fill.components = FALSE,
                                     theme.set = theme.set,
                                     xlab = "Time (s)", ylab = "Signal (cts)",
                                     font.size = 8,

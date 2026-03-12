@@ -92,11 +92,7 @@
 #' @author
 #' Dirk Mittelstraß, \email{dirk.mittelstrass@@luminescence.de}
 #'
-#' Please add the following references to your publication: Your currently used package version, obtained by
-#' `citation("OSLdecomposition")`
-#'
-#' Mittelstraß, D., Schmidt, C., Kreutzer, S., Beyer, J., Straessner, A. and Heitmann, J.:
-#' R package OSLdecomposition: Automated signal component analysis of multi-exponential decays for optically stimulated luminescence applications., *in preparation*.
+#' Please cite this package, including its version number. Enter the command `citation("OSLdecomposition")` to generate the correct reference.
 #'
 #' @seealso [plot_OSLcurve], [fit_OSLcurve], [simulate_OSLcomponents]
 #'
@@ -535,7 +531,7 @@ plot_MultiExponential <- function(curve = NULL,
   # Set legend, axis labels and design choices
   p <- p +
     ggplot2::labs(color = NULL,
-         fill = "Signal components",
+     #    fill = "Signal components",
          subtitle = main, x = xlab, y = ylab) +
     ggplot2::theme(axis.title = ggplot2::element_text(size = font.size),
           ggplot2::element_text(size = font.size + 1, face = "bold"),
